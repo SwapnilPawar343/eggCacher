@@ -1,4 +1,3 @@
-
 const basket = document.getElementById('basket');
 const gameArea = document.getElementById('gameArea');
 const scoreDisplay = document.getElementById('score');
@@ -20,7 +19,9 @@ let keys = {};
 let isDragging = false;
 let startX = 0;
 let basketStartX = 0;
+let basketVelocity = 0;
 let targetLeft = null;
+let lastTime = 0;
 
 // Touch movement
 gameArea.addEventListener("touchstart", (e) => {
@@ -58,6 +59,7 @@ basketSlider.addEventListener("input", () => {
 document.addEventListener('keydown', (e) => keys[e.key] = true);
 document.addEventListener('keyup', (e) => keys[e.key] = false);
 
+// Start Game Button
 startBtn.addEventListener('click', () => {
   startPopup.style.display = 'none';
   resultPopup.style.display = 'none';
@@ -85,8 +87,7 @@ function updateSliderFromBasket() {
 function startGame() {
   countdown();
   spawnLoop();
-  updateLoop();
-  smoothBasketMovement();
+  requestAnimationFrame(updateLoop);
 }
 
 function countdown() {
@@ -118,34 +119,39 @@ function spawnItem() {
   items.push({ el: item, top: 0 });
 }
 
-function updateLoop() {
+function updateLoop(timestamp) {
+  if (!lastTime) lastTime = timestamp;
+  const delta = (timestamp - lastTime) / 16; // normalize frame speed
+  lastTime = timestamp;
+
   if (gameRunning) requestAnimationFrame(updateLoop);
-  updateItems();
-  moveWithKeys();
+
+  moveWithKeys(delta);
+  updateItems(delta);
 }
 
-function moveWithKeys() {
-  const step = 20; // ⬆️ Increased speed
+function moveWithKeys(delta) {
+  const step = 12 * delta; 
   const maxLeft = gameArea.clientWidth - basket.offsetWidth;
   let left = parseFloat(basket.style.left) || basket.offsetLeft;
 
   if (keys['ArrowLeft']) {
     left = Math.max(0, left - step);
-    basket.style.left = `${left}px`;
-    updateSliderFromBasket();
   }
   if (keys['ArrowRight']) {
     left = Math.min(maxLeft, left + step);
-    basket.style.left = `${left}px`;
-    updateSliderFromBasket();
   }
+
+  basket.style.left = `${left}px`;
+  updateSliderFromBasket();
 }
 
-function updateItems() {
+function updateItems(delta) {
   const basketRect = basket.getBoundingClientRect();
+  const fallSpeed = 4 * delta;
 
   items.forEach((item, index) => {
-    item.top += 4;
+    item.top += fallSpeed;
     item.el.style.top = `${item.top}px`;
     const itemRect = item.el.getBoundingClientRect();
 
@@ -183,14 +189,9 @@ function showResult() {
   finalScore.textContent = score;
   resultPopup.style.display = 'block';
 
-const origin = window.location.hostname.includes("localhost")
-  ? "http://localhost:5173"
-  : "https://fulboost.fun";
+  const origin = window.location.hostname.includes("localhost")
+    ? "http://localhost:5173"
+    : "https://fulboost.fun";
 
-window.parent.postMessage({ type: "GAME_OVER", score: score }, origin);
-
-}
-
-function smoothBasketMovement() {
-  requestAnimationFrame(smoothBasketMovement);
+  window.parent.postMessage({ type: "GAME_OVER", score: score }, origin);
 }
